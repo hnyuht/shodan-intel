@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ShodanIntel // Matrix</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --black:   #000000;
+      --bg:      #010c01;
+      --bg2:     #021202;
+      --bg3:     #031803;
+      --g0:      #00ff41;
+      --g1:      #00cc33;
+      --g2:      #008f22;
+      --g3:      #005c15;
+      --g4:      #003a0d;
+      --dim:     #012b01;
+      --amber:   #ffb800;
+      --red:     #ff2020;
+      --blue:    #00cfff;
+      --mono:    'Share Tech Mono', monospace;
+      --vt:      'VT323', monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--black);}
+    body{font-family:var(--mono);color:var(--g0);overflow-x:hidden;}
+
+    /* ── MATRIX RAIN CANVAS ── */
+    #matrixCanvas{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      z-index:0;opacity:0.18;pointer-events:none;
+    }
+
+    /* ── LAYOUT ── */
+    #app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;}
+
+    /* ── TOPBAR ── */
+    .topbar{
+      display:flex;align-items:center;gap:16px;
+      padding:0 20px;height:52px;
+      background:rgba(0,0,0,0.85);
+      border-bottom:1px solid var(--g3);
+      flex-shrink:0;
+      backdrop-filter:blur(4px);
+    }
+    .logo{
+      font-family:var(--vt);font-size:28px;letter-spacing:4px;
+      color:var(--g0);text-shadow:0 0 12px var(--g0),0 0 24px var(--g1);
+      white-space:nowrap;
+    }
+    .logo span{color:var(--g2);}
+    .tagline{font-size:10px;letter-spacing:3px;color:var(--g3);display:none;}
+    @media(min-width:800px){.tagline{display:block;}}
+    .nav{display:flex;gap:2px;margin:0 auto;}
+    .nav-btn{
+      padding:6px 16px;font-family:var(--mono);font-size:11px;letter-spacing:2px;
+      background:transparent;border:1px solid transparent;color:var(--g3);
+      cursor:pointer;transition:all .15s;border-radius:0;
+    }
+    .nav-btn:hover{color:var(--g0);border-color:var(--g3);}
+    .nav-btn.active{color:var(--g0);border-color:var(--g2);background:rgba(0,255,65,0.06);text-shadow:0 0 8px var(--g0);}
+    .topbar-right{display:flex;align-items:center;gap:12px;margin-left:auto;}
+    .live-badge{
+      display:flex;align-items:center;gap:6px;
+      font-size:10px;letter-spacing:2px;color:var(--g0);
+      padding:3px 10px;border:1px solid var(--g3);
+    }
+    .pulse{width:6px;height:6px;border-radius:50%;background:var(--g0);animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,65,.6);}50%{box-shadow:0 0 0 5px rgba(0,255,65,0);}}
+    .clock{font-size:12px;color:var(--g0);letter-spacing:1px;min-width:90px;}
+
+    /* ── PAGES ── */
+    .page{display:none;flex:1;overflow:hidden;flex-direction:column;}
+    .page.active{display:flex;}
+
+    /* ══════════════════════════════════
+       DASHBOARD PAGE
+    ══════════════════════════════════ */
+    #dashPage{overflow-y:auto;}
+    #dashPage::-webkit-scrollbar{width:4px;}
+    #dashPage::-webkit-scrollbar-track{background:var(--black);}
+    #dashPage::-webkit-scrollbar-thumb{background:var(--g3);}
+
+    /* metric grid */
+    .metrics{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+      gap:1px;background:var(--g4);border-bottom:1px solid var(--g4);
+    }
+    .metric{
+      background:var(--bg);padding:14px 18px;position:relative;overflow:hidden;
+    }
+    .metric::before{content:'';position:absolute;top:0;left:0;width:2px;height:100%;background:var(--g3);}
+    .metric.crit::before{background:var(--red);}
+    .metric.warn::before{background:var(--amber);}
+    .metric.ok::before{background:var(--g0);}
+    .metric-lbl{font-size:9px;letter-spacing:2px;color:var(--g3);margin-bottom:6px;}
+    .metric-val{font-family:var(--vt);font-size:42px;line-height:1;color:var(--g0);text-shadow:0 0 10px var(--g1);}
+    .metric-val.red{color:var(--red);text-shadow:0 0 10px var(--red);}
+    .metric-val.amber{color:var(--amber);text-shadow:0 0 10px var(--amber);}
+    .metric-sub{font-size:9px;color:var(--g3);margin-top:3px;}
+
+    /* scan bar */
+    .scanbar{
+      display:flex;align-items:center;gap:24px;
+      padding:7px 20px;background:var(--bg2);
+      border-bottom:1px solid var(--g4);flex-wrap:wrap;
+    }
+    .scanbar-src{display:flex;align-items:center;gap:12px;}
+    .src-lbl{font-size:9px;letter-spacing:2px;color:var(--g2);padding:2px 8px;border:1px solid var(--g4);}
+    .src-time{font-size:9px;color:var(--g3);}
+    .btn-scan{
+      margin-left:auto;padding:5px 20px;
+      background:transparent;border:1px solid var(--g0);
+      color:var(--g0);font-family:var(--mono);font-size:10px;letter-spacing:2px;
+      cursor:pointer;transition:all .2s;
+    }
+    .btn-scan:hover{background:var(--g0);color:var(--black);}
+    .btn-scan:disabled{opacity:.4;cursor:not-allowed;}
+
+    /* main panels row */
+    .panels-row{
+      display:grid;grid-template-columns:1fr 280px;
+      margin:12px 16px 0;gap:12px;
+    }
+    @media(max-width:800px){.panels-row{grid-template-columns:1fr;}}
+
+    .panel{
+      background:rgba(0,0,0,.7);
+      border:1px solid var(--g4);
+      backdrop-filter:blur(2px);
+    }
+    .panel-hdr{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:8px 14px;border-bottom:1px solid var(--g4);
+      font-size:9px;letter-spacing:3px;color:var(--g2);
+    }
+    .panel-hdr-right{font-size:9px;color:var(--g0);letter-spacing:2px;}
+
+    /* worker grid */
+    .worker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px;}
+    @media(max-width:600px){.worker-grid{grid-template-columns:repeat(2,1fr);}}
+    .wcard{
+      border:1px solid var(--g4);padding:8px;background:var(--black);min-height:68px;position:relative;
+    }
+    .wcard.active{border-color:var(--g2);background:rgba(0,255,65,.03);}
+    .wdot{position:absolute;top:8px;right:8px;width:5px;height:5px;border-radius:50%;background:var(--g4);}
+    .wdot.on{background:var(--g0);animation:pulse 1.5s infinite;}
+    .wdot.busy{background:var(--amber);}
+    .wid{font-size:8px;letter-spacing:2px;color:var(--g3);margin-bottom:3px;}
+    .wtask{font-size:9px;color:var(--g0);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .wbadge{display:inline-block;padding:1px 5px;font-size:8px;letter-spacing:1px;border-radius:0;}
+    .wb-idle{color:var(--g3);border:1px solid var(--g4);}
+    .wb-busy{color:var(--amber);border:1px solid rgba(255,184,0,.3);background:rgba(255,184,0,.07);}
+    .wb-done{color:var(--g0);border:1px solid rgba(0,255,65,.3);background:rgba(0,255,65,.06);}
+    .wb-err{color:var(--red);border:1px solid rgba(255,32,32,.3);background:rgba(255,32,32,.07);}
+    .wtime{font-size:8px;color:var(--g3);margin-left:4px;}
+    .wprogbar{height:2px;background:var(--black);margin:6px 10px 10px;}
+    .wprog{height:100%;background:var(--g0);transition:width .4s;box-shadow:0 0 6px var(--g0);}
+
+    /* donut */
+    .donut-wrap{position:relative;width:160px;height:160px;margin:12px auto 6px;}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+    .donut-num{font-family:var(--vt);font-size:32px;color:var(--g0);text-shadow:0 0 8px var(--g1);}
+    .donut-sub{font-size:8px;letter-spacing:2px;color:var(--g3);}
+    .legend{padding:0 14px 10px;}
+    .leg-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--g4);font-size:10px;color:var(--g2);}
+    .leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    .leg-val{margin-left:auto;font-family:var(--vt);font-size:16px;color:var(--g0);}
+
+    /* timeline */
+    .panel-timeline{margin:12px 16px 0;}
+    .timeline-inner{padding:12px;height:200px;}
+
+    /* table */
+    .panel-table{margin:12px 16px 12px;}
+    .tbl-wrap{overflow-x:auto;}
+    .rtbl{width:100%;border-collapse:collapse;font-size:10px;}
+    .rtbl th{padding:7px 14px;text-align:left;font-size:8px;letter-spacing:2px;color:var(--g3);border-bottom:1px solid var(--g4);white-space:nowrap;}
+    .rtbl td{padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.05);color:var(--g0);font-family:var(--mono);white-space:nowrap;}
+    .rtbl tr:hover td{background:rgba(0,255,65,.03);}
+    .empty-r{text-align:center;color:var(--g3);padding:28px !important;}
+    .rtag{display:inline-block;padding:1px 7px;font-size:8px;letter-spacing:1px;}
+    .rtag-c{background:rgba(255,32,32,.1);color:var(--red);border:1px solid rgba(255,32,32,.3);}
+    .rtag-h{background:rgba(255,184,0,.1);color:var(--amber);border:1px solid rgba(255,184,0,.3);}
+    .rtag-m{background:rgba(0,207,255,.1);color:var(--blue);border:1px solid rgba(0,207,255,.3);}
+    .rtag-l{background:rgba(0,255,65,.07);color:var(--g0);border:1px solid var(--g4);}
+
+    /* ══════════════════════════════════
+       CHAT PAGE
+    ══════════════════════════════════ */
+    #chatPage{flex:1;overflow:hidden;}
+    .chat-wrap{display:flex;flex-direction:column;height:100%;}
+    .chat-msgs{
+      flex:1;overflow-y:auto;padding:16px 20px;
+      display:flex;flex-direction:column;gap:14px;
+    }
+    .chat-msgs::-webkit-scrollbar{width:3px;}
+    .chat-msgs::-webkit-scrollbar-thumb{background:var(--g3);}
+
+    .cmsg{display:flex;gap:10px;align-items:flex-start;}
+    .cmsg.user{flex-direction:row-reverse;}
+    .cavatar{
+      width:28px;height:28px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:9px;letter-spacing:1px;border:1px solid;
+    }
+    .cavatar.ai{border-color:var(--g3);color:var(--g0);background:rgba(0,255,65,.05);}
+    .cavatar.user{border-color:rgba(0,207,255,.4);color:var(--blue);background:rgba(0,207,255,.05);}
+    .cbubble{
+      max-width:78%;padding:10px 14px;
+      background:rgba(0,0,0,.6);border:1px solid var(--g4);
+      font-size:12px;line-height:1.7;color:var(--g0);
+    }
+    .cmsg.user .cbubble{border-color:rgba(0,207,255,.2);background:rgba(0,207,255,.04);color:var(--blue);}
+    .cbubble pre{
+      background:var(--black);border:1px solid var(--g4);
+      padding:8px;margin-top:8px;font-size:10px;overflow-x:auto;
+    }
+    .cbubble code{background:var(--bg3);padding:1px 4px;font-size:11px;color:var(--amber);}
+    .tool-call{
+      padding:4px 12px;font-size:9px;letter-spacing:1px;
+      color:var(--g3);border-left:2px solid var(--g4);margin:2px 0;
+    }
+
+    .typing-wrap{display:flex;gap:4px;align-items:center;padding:2px 0;}
+    .typing-wrap span{width:5px;height:5px;border-radius:50%;background:var(--g0);animation:blink 1.2s infinite;}
+    .typing-wrap span:nth-child(2){animation-delay:.2s;}
+    .typing-wrap span:nth-child(3){animation-delay:.4s;}
+    @keyframes blink{0%,80%,100%{opacity:.15}40%{opacity:1}}
+
+    .chat-sugs{
+      display:flex;gap:6px;padding:6px 16px;overflow-x:auto;
+      border-top:1px solid var(--g4);background:rgba(0,0,0,.5);flex-shrink:0;
+    }
+    .chat-sugs::-webkit-scrollbar{height:2px;}
+    .sug{
+      white-space:nowrap;font-family:var(--mono);font-size:9px;letter-spacing:1px;
+      padding:4px 10px;background:transparent;border:1px solid var(--g4);
+      color:var(--g3);cursor:pointer;transition:all .15s;
+    }
+    .sug:hover{border-color:var(--g0);color:var(--g0);background:rgba(0,255,65,.06);}
+
+    .chat-input-row{
+      display:flex;gap:8px;padding:10px 16px;
+      border-top:1px solid var(--g4);background:rgba(0,0,0,.7);flex-shrink:0;
+    }
+    .chat-input-row textarea{
+      flex:1;background:var(--black);border:1px solid var(--g3);
+      padding:8px 12px;color:var(--g0);font-family:var(--mono);font-size:12px;resize:none;outline:none;
+    }
+    .chat-input-row textarea:focus{border-color:var(--g0);box-shadow:0 0 6px rgba(0,255,65,.2);}
+    .chat-input-row textarea::placeholder{color:var(--g4);}
+    .btn-send{
+      padding:0 20px;background:transparent;border:1px solid var(--g0);
+      color:var(--g0);font-family:var(--mono);font-size:10px;letter-spacing:2px;
+      cursor:pointer;transition:all .2s;white-space:nowrap;
+    }
+    .btn-send:hover{background:var(--g0);color:var(--black);}
+    .btn-send:disabled{opacity:.35;cursor:not-allowed;}
+
+    /* risk badges inside bubbles */
+    .rb{display:inline-block;padding:1px 6px;font-size:9px;letter-spacing:1px;margin:0 2px;}
+    .rb-c{background:rgba(255,32,32,.12);color:var(--red);border:1px solid rgba(255,32,32,.4);}
+    .rb-h{background:rgba(255,184,0,.12);color:var(--amber);border:1px solid rgba(255,184,0,.4);}
+    .rb-m{background:rgba(0,207,255,.1);color:var(--blue);border:1px solid rgba(0,207,255,.3);}
+    .rb-l{background:rgba(0,255,65,.06);color:var(--g0);border:1px solid var(--g4);}
+
+    /* footer */
+    footer{
+      text-align:center;padding:6px;font-size:8px;letter-spacing:3px;
+      color:var(--g4);border-top:1px solid var(--g4);flex-shrink:0;
+      background:rgba(0,0,0,.8);
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="matrixCanvas"></canvas>
+
+<div id="app">
+  <!-- TOPBAR -->
+  <nav class="topbar">
+    <div class="logo">SHODAN<span>INTEL</span></div>
+    <span class="tagline">// THREAT INTELLIGENCE MATRIX</span>
+    <div class="nav">
+      <button class="nav-btn active" onclick="showPage('dash',this)">[ OVERVIEW ]</button>
+      <button class="nav-btn" onclick="showPage('chat',this)">[ AI ANALYST ]</button>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge"><span class="pulse"></span>LIVE</div>
+      <span class="clock" id="clock">--:--:--</span>
+    </div>
+  </nav>
+
+  <!-- ═══════════════ DASHBOARD PAGE ═══════════════ -->
+  <div class="page active" id="dashPage">
+
+    <!-- METRICS -->
+    <div class="metrics">
+      <div class="metric ok">
+        <div class="metric-lbl">TOTAL SCANNED</div>
+        <div class="metric-val" id="m-total">—</div>
+      </div>
+      <div class="metric crit">
+        <div class="metric-lbl">CRITICAL EXPOSURE</div>
+        <div class="metric-val red" id="m-crit">—</div>
+      </div>
+      <div class="metric warn">
+        <div class="metric-lbl">HIGH RISK</div>
+        <div class="metric-val amber" id="m-high">—</div>
+      </div>
+      <div class="metric crit">
+        <div class="metric-lbl">RDP OPEN (3389)</div>
+        <div class="metric-val red" id="m-rdp">—</div>
+      </div>
+      <div class="metric warn">
+        <div class="metric-lbl">SSH OPEN (22)</div>
+        <div class="metric-val amber" id="m-ssh">—</div>
+      </div>
+      <div class="metric warn">
+        <div class="metric-lbl">DB PORTS EXPOSED</div>
+        <div class="metric-val amber" id="m-db">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">ACTIVE QUERIES</div>
+        <div class="metric-val" id="m-q">0</div>
+        <div class="metric-sub" id="lastScan">never scanned</div>
+      </div>
+    </div>
+
+    <!-- SCAN BAR -->
+    <div class="scanbar">
+      <div class="scanbar-src">
+        <span class="src-lbl">SHODAN REST API</span>
+        <span class="src-time" id="apiConnStatus">⚠ check config.js</span>
+      </div>
+      <div class="scanbar-src">
+        <span class="src-lbl">CLAUDE AI ENGINE</span>
+        <span class="src-time">claude-sonnet-4-20250514</span>
+      </div>
+      <button class="btn-scan" id="scanBtn" onclick="runScan()">▶ EXECUTE SCAN</button>
+    </div>
+
+    <!-- WORKERS + DONUT -->
+    <div class="panels-row">
+      <div class="panel">
+        <div class="panel-hdr">
+          <span>WORKER TELEMETRY</span>
+          <span class="panel-hdr-right" id="workerStatus">0/8 ACTIVE</span>
+        </div>
+        <div class="worker-grid" id="workerGrid"></div>
+        <div class="wprogbar"><div class="wprog" id="wprog" style="width:0%"></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><span>RISK DISTRIBUTION</span></div>
+        <div class="donut-wrap">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-center">
+            <div class="donut-num" id="donutN">0</div>
+            <div class="donut-sub">TOTAL</div>
+          </div>
+        </div>
+        <div class="legend">
+          <div class="leg-row"><span class="leg-dot" style="background:var(--red)"></span>Critical<span class="leg-val" id="lc">0</span></div>
+          <div class="leg-row"><span class="leg-dot" style="background:var(--amber)"></span>High<span class="leg-val" id="lh">0</span></div>
+          <div class="leg-row"><span class="leg-dot" style="background:var(--blue)"></span>Medium<span class="leg-val" id="lm">0</span></div>
+          <div class="leg-row"><span class="leg-dot" style="background:var(--g3)"></span>Low<span class="leg-val" id="ll">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="panel panel-timeline">
+      <div class="panel-hdr"><span>EXPOSURE TREND — 14 DAYS</span><span class="panel-hdr-right">SIMULATED</span></div>
+      <div class="timeline-inner"><canvas id="timelineChart"></canvas></div>
+    </div>
+
+    <!-- RESULTS TABLE -->
+    <div class="panel panel-table">
+      <div class="panel-hdr">
+        <span>THREAT INTELLIGENCE RESULTS</span>
+        <span class="panel-hdr-right" id="resultCount">0 RESULTS</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="rtbl">
+          <thead><tr><th>IP ADDRESS</th><th>ORGANIZATION</th><th>COUNTRY</th><th>PORTS</th><th>RISK</th><th>LAST SEEN</th></tr></thead>
+          <tbody id="rtbody"><tr><td colspan="6" class="empty-r">► execute scan to populate results</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashPage -->
+
+  <!-- ═══════════════ CHAT PAGE ═══════════════ -->
+  <div class="page" id="chatPage">
+    <div class="chat-wrap">
+      <div class="chat-msgs" id="chatMsgs">
+        <div class="cmsg ai">
+          <div class="cavatar ai">AI</div>
+          <div class="cbubble">
+            <span style="color:var(--g0);font-family:var(--vt);font-size:18px;letter-spacing:2px">// SHODANINTEL ANALYST ONLINE</span><br><br>
+            I have real-time access to the Shodan internet scan database.<br>
+            Ask me anything about internet exposure and threat intelligence:<br><br>
+            <span style="color:var(--g2)">►</span> Which hosts have the highest risk score?<br>
+            <span style="color:var(--g2)">►</span> Show orgs with RDP port 3389 exposed<br>
+            <span style="color:var(--g2)">►</span> Is [your company] exposed to the internet?<br>
+            <span style="color:var(--g2)">►</span> Find unprotected databases in the US<br>
+            <span style="color:var(--g2)">►</span> What ICS/SCADA systems are online?<br><br>
+            <span style="color:var(--g3);font-size:10px">Keys loaded from config.js — edit that file to update them.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-sugs">
+        <button class="sug" onclick="fi('Which hosts have the most open ports and highest overall risk?')">► RISKIEST HOSTS</button>
+        <button class="sug" onclick="fi('Show me organizations with RDP port 3389 open — rank by exposure')">► RDP EXPOSED ORGS</button>
+        <button class="sug" onclick="fi('Check org:Google — what services do they have exposed to the internet?')">► CHECK ORG EXPOSURE</button>
+        <button class="sug" onclick="fi('Find MongoDB instances on port 27017 with no authentication in the US')">► OPEN MONGODB</button>
+        <button class="sug" onclick="fi('Find Elasticsearch port 9200 open — these are often completely unprotected')">► EXPOSED ELASTICSEARCH</button>
+        <button class="sug" onclick="fi('What ICS and SCADA industrial systems are exposed online? Search for Modbus, DNP3, BACnet')">► ICS/SCADA SYSTEMS</button>
+        <button class="sug" onclick="fi('Find hosts running Docker API port 2375 — full container takeover risk')">► DOCKER API EXPOSED</button>
+      </div>
+
+      <div class="chat-input-row">
+        <textarea id="chatIn" rows="2" placeholder="► query the matrix..."></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMsg()">TRANSMIT ▶</button>
+      </div>
+    </div>
+  </div><!-- /chatPage -->
+
+  <footer>SHODANINTEL v2.0 // MATRIX EDITION // AUTHORIZED USE ONLY</footer>
+</div><!-- /app -->
+
+<script>
+// ── MATRIX RAIN ────────────────────────────────────────────
+(function(){
+  const c = document.getElementById('matrixCanvas');
+  const ctx = c.getContext('2d');
+  function resize(){ c.width=window.innerWidth; c.height=window.innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+  let cols, drops;
+  function init(){ cols=Math.floor(c.width/16); drops=Array(cols).fill(1); }
+  init(); window.addEventListener('resize',init);
+  setInterval(()=>{
+    ctx.fillStyle='rgba(0,0,0,0.05)';
+    ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle='#00ff41';
+    ctx.font='14px Share Tech Mono';
+    for(let i=0;i<drops.length;i++){
+      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*16,drops[i]*16);
+      if(drops[i]*16>c.height&&Math.random()>0.975) drops[i]=0;
+      drops[i]++;
+    }
+  },45);
+})();
+
+// ── CLOCK ──────────────────────────────────────────────────
+setInterval(()=>{
+  const t=new Date().toLocaleTimeString('en-US',{hour12:false});
+  document.getElementById('clock').textContent=t;
+},1000);
+
+// ── PAGE NAV ───────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id+'Page').classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── CONFIG CHECK ───────────────────────────────────────────
+const SK = (typeof CONFIG!=='undefined' && CONFIG.SHODAN_API_KEY !== 'YOUR_SHODAN_API_KEY_HERE') ? CONFIG.SHODAN_API_KEY : '';
+const AK = (typeof CONFIG!=='undefined' && CONFIG.ANTHROPIC_API_KEY !== 'YOUR_ANTHROPIC_API_KEY_HERE') ? CONFIG.ANTHROPIC_API_KEY : '';
+
+document.getElementById('apiConnStatus').textContent = SK ? '✓ connected' : '⚠ add key to config.js';
+document.getElementById('apiConnStatus').style.color = SK ? 'var(--g0)' : 'var(--amber)';
+
+// ── RISK SCORING ───────────────────────────────────────────
+const PORT_RISK = {
+  23:'critical',445:'critical',3389:'critical',5900:'critical',4444:'critical',2375:'critical',
+  22:'high',3306:'high',5432:'high',27017:'high',6379:'high',9200:'high',11211:'high',1433:'high',1521:'high',
+  8080:'medium',8443:'medium',21:'medium',25:'medium',8888:'medium',
+  80:'low',443:'low',53:'low',123:'low'
+};
+function scoreHost(ports){ if(!ports?.length)return'low'; for(const p of ports)if(PORT_RISK[p]==='critical')return'critical'; for(const p of ports)if(PORT_RISK[p]==='high')return'high'; for(const p of ports)if(PORT_RISK[p]==='medium')return'medium'; return'low'; }
+
+// ── STATE ──────────────────────────────────────────────────
+let state = { results:[], metrics:{total:0,crit:0,high:0,rdp:0,ssh:0,db:0}, queries:0 };
+let workers = Array(8).fill(null).map((_,i)=>({id:i,status:'idle',task:'',time:0}));
+
+// ── WORKER RENDER ──────────────────────────────────────────
+function renderWorkers(){
+  document.getElementById('workerGrid').innerHTML = workers.map(w=>`
+    <div class="wcard ${w.status!=='idle'?'active':''}">
+      <div class="wdot ${w.status==='busy'?'busy':w.status==='done'?'on':''}"></div>
+      <div class="wid">W${w.id}</div>
+      <div class="wtask">${w.task||'—'}</div>
+      <span class="wbadge ${w.status==='busy'?'wb-busy':w.status==='done'?'wb-done':w.status==='error'?'wb-err':'wb-idle'}">${w.status.toUpperCase()}</span>
+      ${w.time?`<span class="wtime">${w.time}s</span>`:''}
+    </div>`).join('');
+  const active=workers.filter(w=>w.status==='busy').length;
+  document.getElementById('workerStatus').textContent=`${active}/8 ACTIVE`;
+  document.getElementById('wprog').style.width=(active/8*100)+'%';
+}
+
+// ── CHARTS ─────────────────────────────────────────────────
+let donutChart, timelineChart;
+function initCharts(){
+  const chartDefaults = {
+    color: '#005c15',
+    borderColor: 'rgba(0,255,65,0.06)',
+  };
+  Chart.defaults.color = chartDefaults.color;
+
+  donutChart = new Chart(document.getElementById('donutChart'),{
+    type:'doughnut',
+    data:{labels:['Critical','High','Medium','Low'],datasets:[{data:[0,0,0,0],backgroundColor:['#ff2020','#ffb800','#00cfff','#003a0d'],borderWidth:0}]},
+    options:{cutout:'72%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#010c01',borderColor:'rgba(0,255,65,.2)',borderWidth:1,titleColor:'#00ff41',bodyColor:'#005c15',titleFont:{family:'Share Tech Mono'},bodyFont:{family:'Share Tech Mono',size:11}}},animation:{duration:600}}
+  });
+
+  const labels=[], crit=[], high=[], med=[], low=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    labels.push(d.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit'}));
+    const b=600+Math.random()*400;
+    crit.push(Math.round(b*.015+Math.random()*15));
+    high.push(Math.round(b*.08+Math.random()*40));
+    med.push(Math.round(b*.18+Math.random()*60));
+    low.push(Math.round(b*.72+Math.random()*180));
+  }
+  timelineChart = new Chart(document.getElementById('timelineChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Critical',data:crit,backgroundColor:'#ff2020',stack:'s'},
+      {label:'High',data:high,backgroundColor:'#ffb800',stack:'s'},
+      {label:'Medium',data:med,backgroundColor:'#00cfff',stack:'s'},
+      {label:'Low',data:low,backgroundColor:'#003a0d',stack:'s'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{
+      x:{grid:{color:'rgba(0,255,65,0.04)'},ticks:{color:'#005c15',font:{family:'Share Tech Mono',size:9}},border:{color:'rgba(0,255,65,0.08)'}},
+      y:{stacked:true,grid:{color:'rgba(0,255,65,0.04)'},ticks:{color:'#005c15',font:{family:'Share Tech Mono',size:9}},border:{color:'rgba(0,255,65,0.08)'}}
+    },plugins:{legend:{display:false},tooltip:{backgroundColor:'#010c01',borderColor:'rgba(0,255,65,.2)',borderWidth:1,titleColor:'#00ff41',bodyColor:'#005c15',titleFont:{family:'Share Tech Mono'},bodyFont:{family:'Share Tech Mono',size:11}}}}
+  });
+}
+
+function updateDonut(c,h,m,l){
+  const t=c+h+m+l;
+  donutChart.data.datasets[0].data=[c,h,m,l];
+  donutChart.update();
+  document.getElementById('donutN').textContent=t;
+  document.getElementById('lc').textContent=c;
+  document.getElementById('lh').textContent=h;
+  document.getElementById('lm').textContent=m;
+  document.getElementById('ll').textContent=l;
+}
+
+function renderTable(){
+  const tb=document.getElementById('rtbody');
+  const rc=document.getElementById('resultCount');
+  const rows=state.results.slice(-60).reverse();
+  rc.textContent=`${state.results.length} RESULTS`;
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="empty-r">► no data yet</td></tr>';return;}
+  tb.innerHTML=rows.map(h=>{
+    const ports=h.port?[h.port]:(h.ports||[]);
+    const r=scoreHost(ports);
+    const pc=ports.slice(0,5).join(', ')+(ports.length>5?'…':'');
+    const ts=h.timestamp?new Date(h.timestamp).toLocaleDateString():'—';
+    const tagCls={critical:'rtag-c',high:'rtag-h',medium:'rtag-m',low:'rtag-l'}[r];
+    return`<tr>
+      <td style="color:var(--g0)">${h.ip_str||'—'}</td>
+      <td style="color:var(--g2);max-width:160px;overflow:hidden;text-overflow:ellipsis">${h.org||'—'}</td>
+      <td>${h.location?.country_code||'—'}</td>
+      <td style="font-size:9px">${pc||'—'}</td>
+      <td><span class="rtag ${tagCls}">${r.toUpperCase()}</span></td>
+      <td style="color:var(--g3)">${ts}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── SHODAN API ─────────────────────────────────────────────
+async function shodanFetch(endpoint, params={}){
+  if(!SK) throw new Error('No Shodan key in config.js');
+  const url=new URL(`https://api.shodan.io${endpoint}`);
+  url.searchParams.set('key',SK);
+  for(const[k,v] of Object.entries(params)) url.searchParams.set(k,String(v));
+  const r=await fetch(url.toString());
+  if(!r.ok) throw new Error(`Shodan ${r.status}: ${r.statusText}`);
+  return r.json();
+}
+
+// ── LIVE SCAN ──────────────────────────────────────────────
+const SCAN_JOBS = [
+  {q:'port:3389',label:'RDP scan (3389)',metric:'m-rdp'},
+  {q:'port:22',label:'SSH scan (22)',metric:'m-ssh'},
+  {q:'port:27017 OR port:6379 OR port:9200',label:'DB exposure scan',metric:'m-db'},
+];
+
+async function runScan(){
+  if(!SK){ alert('Add your Shodan API key to config.js first!'); return; }
+  const btn=document.getElementById('scanBtn');
+  btn.disabled=true; btn.textContent='■ SCANNING...';
+  state={results:[],metrics:{total:0,crit:0,high:0,rdp:0,ssh:0,db:0},queries:0};
+
+  for(let i=0;i<SCAN_JOBS.length;i++) workers[i]={id:i,status:'busy',task:SCAN_JOBS[i].label,time:0};
+  renderWorkers();
+
+  const timers={};
+  for(let i=0;i<SCAN_JOBS.length;i++){
+    const s=Date.now();
+    timers[i]=setInterval(()=>{ workers[i].time=Math.round((Date.now()-s)/1000); renderWorkers(); },1000);
+  }
+
+  await Promise.all(SCAN_JOBS.map(async({q,label,metric},i)=>{
+    try{
+      const d=await shodanFetch('/shodan/host/search',{query:q,minify:true});
+      clearInterval(timers[i]);
+      workers[i]={id:i,status:'done',task:label,time:workers[i].time};
+      if(d.total!==undefined) document.getElementById(metric).textContent=d.total.toLocaleString();
+      if(d.matches){
+        state.results.push(...d.matches);
+        state.metrics.total+=d.matches.length;
+        let c=0,h=0,m=0,l=0;
+        for(const host of d.matches){
+          const r=scoreHost(host.port?[host.port]:(host.ports||[]));
+          if(r==='critical'){c++;state.metrics.crit++;}
+          else if(r==='high'){h++;state.metrics.high++;}
+          else if(r==='medium')m++;
+          else l++;
+        }
+        updateDonut(state.metrics.crit,state.metrics.high,m,l);
+      }
+      state.queries++;
+      document.getElementById('m-total').textContent=state.metrics.total.toLocaleString();
+      document.getElementById('m-crit').textContent=state.metrics.crit.toLocaleString();
+      document.getElementById('m-high').textContent=state.metrics.high.toLocaleString();
+      document.getElementById('m-q').textContent=state.queries;
+      renderTable();
+    }catch(e){
+      clearInterval(timers[i]);
+      workers[i]={id:i,status:'error',task:e.message,time:0};
+    }
+    renderWorkers();
+  }));
+
+  document.getElementById('lastScan').textContent='last: '+new Date().toLocaleTimeString();
+  btn.disabled=false; btn.textContent='▶ EXECUTE SCAN';
+}
+
+// ── CHAT ───────────────────────────────────────────────────
+let chatHistory=[];
+let chatBusy=false;
+
+function fi(t){ document.getElementById('chatIn').value=t; document.getElementById('chatIn').focus(); }
+
+document.getElementById('chatIn').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}
+});
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addBubble(role,html,pre=false){
+  const wrap=document.getElementById('chatMsgs');
+  const div=document.createElement('div');
+  div.className=`cmsg ${role}`;
+  div.innerHTML=`<div class="cavatar ${role}">${role==='ai'?'AI':'YOU'}</div><div class="cbubble">${pre?html:esc(html)}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop=9999;
+  return div.querySelector('.cbubble');
+}
+
+function showTyping(){
+  const wrap=document.getElementById('chatMsgs');
+  const div=document.createElement('div');
+  div.id='typingInd';div.className='cmsg ai';
+  div.innerHTML=`<div class="cavatar ai">AI</div><div class="cbubble"><div class="typing-wrap"><span></span><span></span><span></span></div></div>`;
+  wrap.appendChild(div); wrap.scrollTop=9999;
+}
+function removeTyping(){ const t=document.getElementById('typingInd'); if(t)t.remove(); }
+
+function addToolCall(text){
+  const wrap=document.getElementById('chatMsgs');
+  const div=document.createElement('div');
+  div.className='tool-call';
+  div.textContent='► '+text;
+  wrap.appendChild(div); wrap.scrollTop=9999;
+}
+
+function fmtResponse(text){
+  let h=esc(text);
+  h=h.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--g0)">$1</strong>');
+  h=h.replace(/`([^`]+)`/g,'<code>$1</code>');
+  h=h.replace(/```[\w]*\n?([\s\S]*?)```/g,(_,c)=>`<pre>${esc(c).trim()}</pre>`);
+  h=h.replace(/\bCRITICAL\b/g,'<span class="rb rb-c">CRITICAL</span>');
+  h=h.replace(/\bHIGH RISK\b/gi,'<span class="rb rb-h">HIGH RISK</span>');
+  h=h.replace(/\bMEDIUM RISK\b/gi,'<span class="rb rb-m">MEDIUM RISK</span>');
+  h=h.replace(/\bLOW RISK\b/gi,'<span class="rb rb-l">LOW RISK</span>');
+  h=h.replace(/\n/g,'<br>');
+  return h;
+}
+
+const TOOLS=[
+  {name:'shodan_host_info',description:'Get all ports/services for a specific IP address.',input_schema:{type:'object',properties:{ip:{type:'string',description:'IP address'}},required:['ip']}},
+  {name:'shodan_search',description:'Search Shodan. Use filters: port:N, org:"Name", country:XX, vuln:CVE-XXXX, product:X, has_vuln:true. Returns hosts with ports, org, location.',input_schema:{type:'object',properties:{query:{type:'string'},facets:{type:'string',description:'e.g. "org:20,country:10"'},page:{type:'number'}},required:['query']}},
+  {name:'shodan_count',description:'Count results for a query without using API credits. Use FIRST to gauge scale.',input_schema:{type:'object',properties:{query:{type:'string'},facets:{type:'string'}},required:['query']}},
+  {name:'shodan_dns_resolve',description:'Resolve hostname(s) to IP addresses.',input_schema:{type:'object',properties:{hostnames:{type:'string',description:'comma-separated hostnames'}},required:['hostnames']}}
+];
+
+async function callShodan(name,input){
+  if(!SK) return {error:'No Shodan API key in config.js'};
+  const base='https://api.shodan.io';
+  try{
+    if(name==='shodan_host_info'){
+      const r=await fetch(`${base}/shodan/host/${input.ip}?key=${SK}`);
+      return r.json();
+    }
+    if(name==='shodan_search'){
+      const p=new URLSearchParams({key:SK,query:input.query,minify:'true'});
+      if(input.facets)p.set('facets',input.facets);
+      if(input.page)p.set('page',input.page);
+      const r=await fetch(`${base}/shodan/host/search?${p}`);
+      return r.json();
+    }
+    if(name==='shodan_count'){
+      const p=new URLSearchParams({key:SK,query:input.query});
+      if(input.facets)p.set('facets',input.facets);
+      const r=await fetch(`${base}/shodan/host/count?${p}`);
+      return r.json();
+    }
+    if(name==='shodan_dns_resolve'){
+      const r=await fetch(`${base}/dns/resolve?key=${SK}&hostnames=${input.hostnames}`);
+      return r.json();
+    }
+  }catch(e){ return {error:e.message}; }
+}
+
+const SYS=`You are SHODANINTEL, an elite cybersecurity threat intelligence analyst with real-time Shodan access.
+
+RISK PORT TAXONOMY:
+CRITICAL: 23(Telnet),445(SMB),3389(RDP),5900(VNC),4444(backdoor),2375(Docker API unauth)
+HIGH: 22(SSH),3306(MySQL),5432(PostgreSQL),27017(MongoDB),6379(Redis),9200(Elasticsearch),11211(Memcached),1433(MSSQL),1521(Oracle)
+MEDIUM: 8080,8443,21(FTP),25(SMTP),8888(Jupyter Notebooks)
+LOW: 80,443,53,123
+
+WORKFLOW:
+1. Use shodan_count FIRST (no credits) to gauge scale
+2. Use shodan_search with facets like "org:20,country:10" to find top exposed entities
+3. Drill into specific IPs with shodan_host_info
+4. Synthesize with attacker-perspective risk analysis
+
+Always: explain what each exposure means to an attacker, rank by severity, be specific about exploitation potential.
+Shodan key: ${SK||'NOT SET — user must edit config.js'}`;
+
+async function sendMsg(){
+  const inp=document.getElementById('chatIn');
+  const text=inp.value.trim();
+  if(!text||chatBusy)return;
+  if(!AK){addBubble('ai','<span style="color:var(--amber)">⚠ Add your Anthropic API key to config.js to use the AI analyst.</span>',true);return;}
+
+  inp.value='';
+  chatBusy=true;
+  document.getElementById('sendBtn').disabled=true;
+  addBubble('user',text);
+  chatHistory.push({role:'user',content:text});
+  showTyping();
+
+  try{
+    let msgs=[...chatHistory];
+    let loop=true;
+    while(loop){
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key':AK,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:SYS,tools:TOOLS,messages:msgs})
+      });
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message);
+
+      if(data.stop_reason==='tool_use'){
+        msgs.push({role:'assistant',content:data.content});
+        const results=[];
+        for(const b of data.content){
+          if(b.type==='tool_use'){
+            removeTyping();
+            addToolCall(`${b.name}(${JSON.stringify(b.input).slice(0,80)}...)`);
+            showTyping();
+            const r=await callShodan(b.name,b.input);
+            results.push({type:'tool_result',tool_use_id:b.id,content:JSON.stringify(r).slice(0,10000)});
+          }
+        }
+        msgs.push({role:'user',content:results});
+      } else {
+        loop=false;
+        removeTyping();
+        const tb=data.content?.find(b=>b.type==='text');
+        if(tb){
+          addBubble('ai',fmtResponse(tb.text),true);
+          chatHistory=msgs;
+          chatHistory.push({role:'assistant',content:data.content});
+        }
+      }
+    }
+  }catch(e){
+    removeTyping();
+    addBubble('ai',`<span style="color:var(--red)">ERROR: ${esc(e.message)}</span>`,true);
+  }
+  chatBusy=false;
+  document.getElementById('sendBtn').disabled=false;
+  inp.focus();
+}
+
+// ── INIT ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  initCharts();
+  renderWorkers();
+  // demo metrics
+  document.getElementById('m-total').textContent='3,906';
+  document.getElementById('m-crit').textContent='11';
+  document.getElementById('m-high').textContent='135';
+  document.getElementById('m-rdp').textContent='42,891';
+  document.getElementById('m-ssh').textContent='2.1M';
+  document.getElementById('m-db').textContent='18,432';
+  updateDonut(11,135,412,3348);
+});
+</script>
+</body>
+</html>
