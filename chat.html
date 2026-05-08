@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShodanIntel — AI Analyst</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <div class="logo-mark">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <circle cx="11" cy="11" r="10" stroke="#00ff88" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="5" stroke="#00ff88" stroke-width="1"/>
+        <line x1="11" y1="1" x2="11" y2="4" stroke="#00ff88" stroke-width="1.5"/>
+        <line x1="11" y1="18" x2="11" y2="21" stroke="#00ff88" stroke-width="1.5"/>
+        <line x1="1" y1="11" x2="4" y2="11" stroke="#00ff88" stroke-width="1.5"/>
+        <line x1="18" y1="11" x2="21" y2="11" stroke="#00ff88" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <span class="app-name">SHODAN<span class="accent">INTEL</span></span>
+  </div>
+  <div class="topbar-nav">
+    <a href="index.html" class="nav-tab">Overview</a>
+    <a href="chat.html" class="nav-tab active">AI Analyst</a>
+    <a href="#" class="nav-tab">Hosts</a>
+    <a href="#" class="nav-tab">Alerts</a>
+  </div>
+  <div class="topbar-right">
+    <span class="status-pill">
+      <span class="pulse-dot"></span>
+      LIVE
+    </span>
+    <span class="clock" id="clock">--:--:-- ET</span>
+  </div>
+</nav>
+
+<div class="api-bar">
+  <span class="api-label">⚡ SHODAN API KEY</span>
+  <input type="password" id="shodanKeyInput" placeholder="Enter Shodan API key..." />
+  <span class="api-label" style="margin-left:16px">🤖 ANTHROPIC KEY</span>
+  <input type="password" id="anthropicKeyInput" placeholder="Enter Anthropic API key..." />
+  <button onclick="saveKeys()" class="btn-connect">CONNECT</button>
+  <span class="api-status" id="keyStatus">Add both API keys to enable the AI analyst</span>
+</div>
+
+<div class="chat-container">
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg ai">
+      <div class="chat-avatar ai">AI</div>
+      <div class="chat-bubble">
+        <strong style="color:var(--green)">SHODANINTEL ANALYST ONLINE</strong><br><br>
+        I'm your AI-powered threat intelligence analyst. I can query Shodan in real-time to answer questions like:<br><br>
+        &gt; Which hosts have the most risk exposure?<br>
+        &gt; Show me organizations with RDP (3389) open<br>
+        &gt; Is [your company] exposed — what's their attack surface?<br>
+        &gt; Find hosts with critical CVEs in [country]<br>
+        &gt; What ICS/SCADA systems are exposed online?<br><br>
+        Add your Shodan + Anthropic API keys above to begin.
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-suggestions">
+    <button class="sug-btn" onclick="fillInput('Which hosts have the most open ports and highest risk score?')">▶ MOST RISKY HOSTS</button>
+    <button class="sug-btn" onclick="fillInput('Show me organizations with RDP port 3389 open to the internet')">▶ RDP EXPOSED ORGS</button>
+    <button class="sug-btn" onclick="fillInput('Check if Google is exposed — search org:Google and tell me their attack surface')">▶ CHECK ORG EXPOSURE</button>
+    <button class="sug-btn" onclick="fillInput('Find hosts in the US with MongoDB port 27017 open with no authentication')">▶ OPEN MONGODB</button>
+    <button class="sug-btn" onclick="fillInput('What ICS and SCADA systems are exposed online? Use product:modbus or similar')">▶ ICS/SCADA SYSTEMS</button>
+    <button class="sug-btn" onclick="fillInput('Find Elasticsearch instances with port 9200 open — these are often unprotected')">▶ EXPOSED ELASTICSEARCH</button>
+  </div>
+
+  <div class="chat-input-row">
+    <textarea id="chatInput" rows="2" placeholder="&gt; Ask about exposed hosts, org risk, open ports, vulnerabilities..."></textarea>
+    <button class="chat-send" id="sendBtn" onclick="sendMessage()">SEND ↗</button>
+  </div>
+</div>
+
+<script src="js/chat.js"></script>
+</body>
+</html>
